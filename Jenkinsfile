@@ -7,18 +7,11 @@ pipeline {
         DOCKER_SERVER = 'ubuntu@ip-172-31-29-171'
     }
 
-    options {
-        disableConcurrentBuilds()   
-        timeout(time: 15, unit: 'MINUTES') 
-    }
-
     stages {
-
         stage('Checkout Code') {
             steps {
-                git branch: 'master',
-                    url: "${REPO_URL}",
-                    credentialsId: 'github-credentials'
+                // credentialsId remove kar diya agar repo public hai
+                git branch: 'master', url: "${REPO_URL}"
             }
         }
 
@@ -30,9 +23,7 @@ pipeline {
                         sh """
                         ${scannerHome}/bin/sonar-scanner \
                         -Dsonar.projectKey=portfolio-cloud \
-                        -Dsonar.projectName=portfolio-cloud \
-                        -Dsonar.sources=. \
-                        -Dsonar.exclusions=node_modules/**,.git/**,Dockerfile
+                        -Dsonar.sources=.
                         """
                     }
                 }
@@ -41,30 +32,21 @@ pipeline {
 
         stage('Docker Build & Deploy') {
             steps {
-                sshagent(['docker-credentials']) {
+                // ID 'ubuntu' use ki hai jo aapke screenshot mein hai
+                sshagent(['ubuntu']) {
                     sh """
-                    scp -o StrictHostKeyChecking=no index.html Dockerfile \
-                    ${DOCKER_SERVER}:/home/ubuntu/
+                    scp -o StrictHostKeyChecking=no index.html Dockerfile ${DOCKER_SERVER}:/home/ubuntu/
 
                     ssh -o StrictHostKeyChecking=no ${DOCKER_SERVER} '
                         cd /home/ubuntu
-                        docker build -t portfolio-app .
-                        docker stop portfolio-app || true
-                        docker rm portfolio-app || true
-                        docker run -d -p 80:80 --name portfolio-app portfolio-app
+                        sudo docker build -t portfolio-app .
+                        sudo docker stop portfolio-app || true
+                        sudo docker rm portfolio-app || true
+                        sudo docker run -d -p 80:80 --name portfolio-app portfolio-app
                     '
                     """
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Deployment Successful: http://172.31.26.188"
-        }
-        failure {
-            echo "Pipeline Failed"
         }
     }
 }
