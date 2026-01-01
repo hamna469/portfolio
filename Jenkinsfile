@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         REPO_URL      = 'https://github.com/hamna469/portfolio'
-        // Target Server (Jahan website dikhegi)
+        SONARQUBE_ENV = 'SonarQube-Server'
         DOCKER_SERVER = 'ubuntu@ip-172-31-29-171'
     }
 
@@ -14,15 +14,31 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarQube Scanner'
+                    withSonarQubeEnv("${SONARQUBE_ENV}") {
+                        // Scan ko fast karne ke liye exclusions add kiye hain
+                        sh """
+                        ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=portfolio-cloud \
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions=**/*.css,**/*.js,node_modules/** \
+                        -Dsonar.language=html
+                        """
+                    }
+                }
+            }
+        }
+
         stage('Docker Build & Deploy') {
             steps {
-                // Jenkins me 'ubuntu' ID wale credentials check kar lein
-                sshagent(['docker-credentials']) {
+                // 'ubuntu' ID check karein Jenkins credentials mein
+                sshagent(['ubuntu']) {
                     sh """
-                    # 1. Files copy karna
                     scp -o StrictHostKeyChecking=no index.html Dockerfile ${DOCKER_SERVER}:/home/ubuntu/
 
-                    # 2. Remote commands run karna
                     ssh -o StrictHostKeyChecking=no ${DOCKER_SERVER} "
                         cd /home/ubuntu
                         sudo docker build -t portfolio-app .
@@ -37,9 +53,6 @@ pipeline {
     }
 
     post {
-        success {
-            echo "Deployment Successful! Ab check karein: http://172.31.29.171"
-        }
         failure {
             echo "Kuch ghalat hua hai. Logs check karein."
         }
