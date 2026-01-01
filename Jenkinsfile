@@ -19,7 +19,6 @@ pipeline {
                 script {
                     def scannerHome = tool 'SonarQube Scanner'
                     withSonarQubeEnv("${SONARQUBE_ENV}") {
-                        // Scan ko fast karne ke liye exclusions add kiye hain
                         sh """
                         ${scannerHome}/bin/sonar-scanner \
                         -Dsonar.projectKey=portfolio-cloud \
@@ -34,11 +33,12 @@ pipeline {
 
         stage('Docker Build & Deploy') {
             steps {
-                // 'ubuntu' ID check karein Jenkins credentials mein
                 sshagent(['ubuntu']) {
                     sh """
+                    # Transfer files
                     scp -o StrictHostKeyChecking=no index.html Dockerfile ${DOCKER_SERVER}:/home/ubuntu/
 
+                    # Remote Deploy
                     ssh -o StrictHostKeyChecking=no ${DOCKER_SERVER} "
                         cd /home/ubuntu
                         sudo docker build -t portfolio-app .
@@ -49,12 +49,6 @@ pipeline {
                     """
                 }
             }
-        }
-    }
-
-    post {
-        failure {
-            echo "Kuch ghalat hua hai. Logs check karein."
         }
     }
 }
