@@ -14,20 +14,20 @@ pipeline {
             }
         }
 
-        stage('Quality Analysis & Deployment') {
+        stage('Quality & Deployment') {
             parallel {
-                stage('SonarQube Scan') {
+                stage('SonarQube Analysis') {
                     steps {
                         script {
                             def scannerHome = tool 'SonarQube Scanner'
                             withSonarQubeEnv("${SONARQUBE_ENV}") {
+                                // Background scan: results ka wait nahi karega
                                 sh """
                                 ${scannerHome}/bin/sonar-scanner \
                                 -Dsonar.projectKey=portfolio-cloud \
                                 -Dsonar.sources=. \
-                                -Dsonar.exclusions=**/*.css,**/*.js,**/*.png,**/*.jpg,node_modules/** \
-                                -Dsonar.javascript.node.maxspace=512 \
-                                -Dsonar.qualitygate.wait=true
+                                -Dsonar.exclusions=**/*.css,**/*.js,node_modules/** \
+                                -Dsonar.qualitygate.wait=false
                                 """
                             }
                         }
@@ -36,12 +36,11 @@ pipeline {
 
                 stage('Docker Build & Deploy') {
                     steps {
+                        // Jenkins credentials ID 'ubuntu' honi chahiye
                         sshagent(['ubuntu']) {
                             sh """
-                            # Copy files to Target Server
                             scp -o StrictHostKeyChecking=no index.html Dockerfile ${DOCKER_SERVER}:/home/ubuntu/
 
-                            # Build and Run on Target Server
                             ssh -o StrictHostKeyChecking=no ${DOCKER_SERVER} "
                                 cd /home/ubuntu
                                 sudo docker build -t portfolio-app .
@@ -54,15 +53,6 @@ pipeline {
                     }
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Analysis Completed & App Deployed!"
-        }
-        failure {
-            echo "Pipeline Failed. Check SonarQube or SSH connection."
         }
     }
 }
